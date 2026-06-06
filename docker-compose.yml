@@ -1,0 +1,119 @@
+services:
+  # ─── API (Hono/Node.js) ───────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: polireports-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src  # hot reload in dev
+    networks:
+      - polireports
+
+  # ─── Worker (same codebase, different entrypoint) ─────────────────────
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: polireports-worker
+    restart: unless-stopped
+    command: node dist/worker.js
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - polireports
+
+  # ─── Dashboard (React/Vite) ───────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+    container_name: polireports-dashboard
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    env_file: .env
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    networks:
+      - polireports
+
+  # ─── Redis (BullMQ job queues) ────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: polireports-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - polireports
+
+  # ─── n8n (orchestration / scheduling) ────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: polireports-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file: .env
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - DB_TYPE=sqlite
+      - N8N_USER_FOLDER=/home/node/.n8n
+      - GENERIC_TIMEZONE=America/New_York
+      # Allow n8n to call internal API
+      - NODE_FUNCTION_ALLOW_EXTERNAL=axios,node-fetch
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./infra/n8n/workflows:/home/node/.n8n/workflows:ro
+    networks:
+      - polireports
+
+  # ─── Redis UI (dev only) ──────────────────────────────────────────────
+  redis-ui:
+    image: redis/redisinsight:latest
+    container_name: polireports-redis-ui
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    profiles:
+      - dev
+    networks:
+      - polireports
+
+volumes:
+  redis_data:
+  n8n_data:
+
+networks:
+  polireports:
+    driver: bridge
