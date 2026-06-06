@@ -1,0 +1,18 @@
+# Dev override — auto-merged by `docker compose`.
+# Publishes Postgres + Redis to localhost on NON-STANDARD ports so host-side
+# dev tooling (seed scripts, tests) can reach them. The app containers still
+# talk to them in-network by hostname; these host ports are dev convenience
+# only and are bound to 127.0.0.1.
+#
+# Production deploys should NOT use this file (deploy with an explicit
+# `-f docker-compose.yml` only). Host 5432/6379 are commonly already taken,
+# hence 55432/56379.
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:55432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:56379:6379"

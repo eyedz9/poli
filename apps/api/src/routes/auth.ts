@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { hash, compare, hashSync } from 'bcryptjs'
+import bcrypt from 'bcryptjs'
+const { hash, compare, hashSync } = bcrypt
 import { db } from '../lib/db.js'
 import { signToken, requireInternalToken } from '../lib/auth.js'
 

@@ -1,0 +1,44 @@
+{
+  "name": "PoliReports — Scheduled Ingest + Narrative Refresh",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "schedule",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/issues/trigger-ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "authorization", "value": "Bearer ={{ $env.INTERNAL_TRIGGER_TOKEN }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"source\": \"all\" }",
+        "options": {}
+      },
+      "id": "trigger-ingest",
+      "name": "Trigger ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    }
+  ],
+  "connections": {
+    "Every 6 hours": { "main": [[{ "node": "Trigger ingest", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Reference orchestration: every 6h, n8n calls the API's internal ingest trigger (Bearer INTERNAL_TRIGGER_TOKEN). The ingest engine enqueues a BullMQ job; the worker processes it. Import via the n8n UI at http://localhost:5678 and activate. The narrative refresh can be chained as a second HTTP node once a /trigger-narrative route is exposed."
+  }
+}

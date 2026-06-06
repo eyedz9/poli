@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { serve } from '@hono/node-server'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { prettyJSON } from 'hono/pretty-json'
@@ -29,9 +30,8 @@ app.route('/api/channels', channelsRouter)
 app.route('/api/briefs', briefsRouter)
 
 const port = parseInt(process.env.API_PORT ?? '3000')
-console.log(`API running on :${port}`)
+serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
+  console.log(`API running on :${info.port}`)
+})
 
-export default {
-  port,
-  fetch: app.fetch,
-}
+export default app

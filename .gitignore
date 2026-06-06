@@ -22,3 +22,12 @@ infra/n8n/data/
 *.log
 *.pem
 secrets/
+
+# playwright / local test artifacts
+.playwright-mcp/
+*.png
+*.local.mjs
+
+# dev compose override (host-only ports; not for prod)
+# (kept in repo intentionally — comment out the next line to ignore it locally)
+# docker-compose.override.yml

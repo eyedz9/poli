@@ -44,11 +44,13 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    # noeviction: BullMQ is a job queue, not a cache — evicting keys would
+    # silently drop jobs. maxmemory raised to give the queue headroom.
     command: >
       redis-server
       --appendonly yes
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
       --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
@@ -108,12 +110,17 @@ services:
     build:
       context: ./apps/dashboard
       dockerfile: Dockerfile
+      target: dev
     container_name: polireports-dashboard
     restart: unless-stopped
     ports:
       - "127.0.0.1:5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:3000
+      # In-network hostname — the Vite dev server proxies /api here from inside
+      # the dashboard container, so it must be 'api', not 'localhost'.
+      - VITE_API_URL=http://api:3000
+    depends_on:
+      - api
     networks:
       - polireports
 

@@ -3,21 +3,29 @@ import { z } from 'zod'
 import { db } from '../lib/db.js'
 import { queues } from '../lib/queues.js'
 import { requireAuth } from '../lib/auth.js'
+import type { AppEnv } from '../lib/types.js'
 
-export const briefsRouter = new Hono()
+export const briefsRouter = new Hono<AppEnv>()
 
+// Segments must match the dashboard select + seed SEGMENTS so the whole
+// listen→advise flow uses one vocabulary.
 const GenerateBriefSchema = z.object({
   issueId: z.string().uuid(),
   position: z.string().min(10).max(500),
   principle: z.string().min(10).max(500),
-  targetSegment: z.enum(['progressive', 'conservative', 'moderate', 'persuadable']),
+  targetSegment: z.enum([
+    'persuadable independents',
+    'cost-conscious moderates',
+    'civic-minded conservatives',
+    'pragmatic progressives',
+  ]),
 })
 
 briefsRouter.get('/issue/:issueId', requireAuth, async (c) => {
   // Briefs are owner-scoped — only return the caller's own briefs.
   const rows = await db`
     SELECT * FROM briefs
-    WHERE issue_id = ${c.req.param('issueId')}
+    WHERE issue_id = ${c.req.param('issueId')!}
       AND created_by = ${c.get('userId')}
     ORDER BY created_at DESC
   `

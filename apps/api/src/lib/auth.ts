@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono'
 import { SignJWT, jwtVerify } from 'jose'
+import type { AppEnv } from './types.js'
 
 const getJwtSecret = () => {
   const s = process.env.JWT_SECRET
@@ -23,7 +24,7 @@ export async function verifyToken(token: string) {
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
 // Dashboard users: validate JWT, set userId + role on context.
-export async function requireAuth(c: Context, next: Next) {
+export async function requireAuth(c: Context<AppEnv>, next: Next) {
   const header = c.req.header('authorization') ?? ''
   const token = header.replace(/^Bearer\s+/i, '')
   if (!token) return c.json({ error: 'unauthorized' }, 401)

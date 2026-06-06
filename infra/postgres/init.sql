@@ -256,6 +256,19 @@ CREATE TABLE channel_issue_signals (
   CONSTRAINT unique_channel_issue UNIQUE (channel_id, issue_id)
 );
 
+-- ─── users (local auth — replaces Supabase Auth) ─────────────────────────────
+-- Defined before briefs because briefs.created_by references users(id).
+
+CREATE TABLE users (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'client',   -- client|admin
+  org_id        UUID,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ
+);
+
 -- ─── briefs ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE briefs (
@@ -336,18 +349,6 @@ CREATE TABLE audit_events (
 
 CREATE INDEX ON audit_events (event_type, created_at DESC);
 CREATE INDEX ON audit_events (actor_id, created_at DESC);
-
--- ─── users (local auth — replaces Supabase Auth) ─────────────────────────────
-
-CREATE TABLE users (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email         TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  role          TEXT NOT NULL DEFAULT 'client',   -- client|admin
-  org_id        UUID,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_login_at TIMESTAMPTZ
-);
 
 -- ─── Momentum scoring function ────────────────────────────────────────────────
 

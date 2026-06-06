@@ -1,9 +1,10 @@
-import { Worker } from 'bullmq'
+import { Worker, type ConnectionOptions } from 'bullmq'
 import Redis from 'ioredis'
 
+// BullMQ bundles its own ioredis copy; cast reconciles duplicate type identities.
 const connection = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
-})
+}) as unknown as ConnectionOptions
 
 // Queue names — match what n8n posts to via HTTP trigger
 const QUEUES = ['ingest', 'narrative', 'persona', 'influencer', 'language'] as const
