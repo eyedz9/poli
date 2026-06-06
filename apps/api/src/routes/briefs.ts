@@ -1,10 +1,19 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { supabase } from '../lib/supabase.js'
 import { queues } from '../lib/queues.js'
+import { requireAuth } from '../lib/auth.js'
 
 export const briefsRouter = new Hono()
 
-briefsRouter.get('/issue/:issueId', async (c) => {
+const GenerateBriefSchema = z.object({
+  issueId: z.string().uuid(),
+  position: z.string().min(10).max(500),
+  principle: z.string().min(10).max(500),
+  targetSegment: z.enum(['progressive', 'conservative', 'moderate', 'persuadable']),
+})
+
+briefsRouter.get('/issue/:issueId', requireAuth, async (c) => {
   const { data, error } = await supabase
     .from('briefs')
     .select('*')
@@ -14,9 +23,11 @@ briefsRouter.get('/issue/:issueId', async (c) => {
   return c.json(data)
 })
 
-// Generate a new language bridge brief
-briefsRouter.post('/generate', async (c) => {
+// Authenticated: dashboard users trigger brief generation.
+briefsRouter.post('/generate', requireAuth, async (c) => {
   const body = await c.req.json()
-  const job = await queues.language.add('generate-brief', body)
+  const parsed = GenerateBriefSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const job = await queues.language.add('generate-brief', parsed.data)
   return c.json({ jobId: job.id }, 202)
 })

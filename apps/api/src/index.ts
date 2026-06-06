@@ -7,9 +7,15 @@ import { personasRouter } from './routes/personas.js'
 import { channelsRouter } from './routes/channels.js'
 import { briefsRouter } from './routes/briefs.js'
 
+const DASHBOARD_ORIGINS = (process.env.DASHBOARD_ORIGINS ?? 'http://localhost:5173').split(',')
+
 const app = new Hono()
 
-app.use('*', cors())
+app.use('*', cors({
+  origin: DASHBOARD_ORIGINS,
+  allowMethods: ['GET', 'POST'],
+  credentials: false,
+}))
 app.use('*', logger())
 app.use('*', prettyJSON())
 
