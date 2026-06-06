@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { hash, compare } from 'bcryptjs'
+import { hash, compare, hashSync } from 'bcryptjs'
 import { db } from '../lib/db.js'
 import { signToken, requireInternalToken } from '../lib/auth.js'
 
@@ -11,10 +11,13 @@ const CredSchema = z.object({
   password: z.string().min(12),
 })
 
-// Pre-computed bcrypt hash of a random string. Compared against on
-// login when no user is found, so response time is constant regardless
-// of whether the email exists (defeats user-enumeration timing oracle).
-const DUMMY_HASH = '$2a$12$C6UzMDM.H6dfI/f/IKcEeO3oUaXq6h5Y3PqHq9Xq8Xq8Xq8Xq8Xq.'
+// Valid bcrypt hash (cost 12) of an unknown string, computed once at
+// startup. Compared against on login when no user is found, so a full
+// bcrypt round runs and response time is constant regardless of whether
+// the email exists — defeats the user-enumeration timing oracle.
+// Computed (not a literal) to guarantee structural validity; a malformed
+// hash would make compare() bail early and reintroduce the timing gap.
+const DUMMY_HASH = hashSync(`dummy-${process.env.JWT_SECRET ?? 'x'}`, 12)
 
 // Registration is admin-provisioning only — gated behind the internal
 // token, not public. Prevents anyone from self-registering into the
