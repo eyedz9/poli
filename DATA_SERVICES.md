@@ -1,7 +1,7 @@
 # Data Services Map — Available Providers for the People Intelligence Engine
 
 _Research date: 2026-06-06. Honest assessment: what works, what's expensive, what to avoid at MVP._
-_Creative auto-gen is OUT of scope. Focus: data gathering for actionable insight._
+_Creative auto-gen is back IN scope (closes the loop: insight → ready-to-run ad). This doc still focuses on data gathering; creative generation infra is covered separately._
 
 ---
 

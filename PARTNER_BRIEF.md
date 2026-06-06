@@ -10,11 +10,11 @@ _Date: 2026-06-06_
 
 PoliReports is a **People Intelligence Engine** for political and advocacy marketing.
 
-In one sentence: it watches what real people are saying online about political/social issues, figures out which issues are heating up and where, identifies who has the most engaged audiences talking about them, builds aggregate profiles of those audiences, and tells a campaign how to phrase its message so it lands with people who don't already agree.
+In one sentence: it watches what real people are saying online about political/social issues, figures out which issues are heating up and where, identifies who has the most engaged audiences talking about them, builds aggregate profiles of those audiences, tells a campaign how to phrase its message so it lands with people who don't already agree, **and then produces the ready-to-run ad creative to say it.**
 
 It is **nonpartisan by design** — it sells to anyone (campaigns, advocacy orgs, issue groups, corporate public affairs). The target customer is **down-ballot and advocacy SMBs**: state legislative races, local races, ballot initiatives, advocacy nonprofits. People with real budgets that the enterprise tools (Resonate, Civis, DSPolitical) don't bother serving.
 
-It is built around four engines:
+It is built around five engines:
 
 | Engine | What it does | Output |
 |---|---|---|
@@ -22,26 +22,28 @@ It is built around four engines:
 | **Audience Persona** | Builds *aggregate* cohort profiles from public comment corpora | Audience profiles (no individual profiling) |
 | **Influencer / CVS** | Ranks channels by a proprietary Comment Vitality Score | Which creators have genuinely engaged comment sections on an issue |
 | **Language / Framing** | Applies Moral Foundations Theory to generate cross-partisan reframes | Message briefs that speak to the other side without abandoning your principles |
+| **Creative** | Turns the message brief into ready-to-run ad creative — HTML5 display banners, social static, and video | Production-ready ads, sized per platform, with required political disclaimers |
 
-**Explicitly out of scope for now:** auto-generating the actual ad creative. We stop at the brief.
+**This is the wedge.** Every competitor stops at insight or audience. PoliReports is the only one that closes the loop all the way to the finished ad — and it does so by leaning on the founder's actual production background (HTML5/GSAP/video) and existing AdForge ad-creative tooling. The intelligence engine is the body; the creative engine is what makes it a closed-loop product instead of one more dashboard.
 
 ---
 
 ## 2. How it works
 
 ```
-LISTEN                    INTERPRET                  ADVISE
-─────────────────         ──────────────────         ──────────────────
-Google Trends      ┐      Narrative engine     ┐     Ranked issues
-GDELT (news)       │      (LLM clustering)     │     Audience personas
-YouTube comments   ├──►   Persona engine       ├──► Top channels (CVS)
-Apify (Reddit)     │      Influencer scoring   │     Reframed message briefs
-Bluesky firehose   ┘      Language engine      ┘     Confidence on everything
+LISTEN                  INTERPRET                ADVISE                 CREATE
+───────────────         ────────────────         ─────────────────      ──────────────────
+Google Trends    ┐      Narrative engine  ┐      Ranked issues          HTML5 display ads
+GDELT (news)     │      (LLM clustering)  │      Audience personas       Social static
+YouTube comments ├──►   Persona engine    ├──►   Top channels (CVS) ├──► Video drafts
+Apify (Reddit)   │      Influencer scoring│      Reframed briefs         Sized per platform
+Bluesky firehose ┘      Language engine   ┘      Confidence scores        + political disclaimers
 ```
 
 1. **Ingest** — Pull from five public sources on a schedule (n8n orchestrates).
 2. **Process** — LLM clusters raw posts into issues; scores momentum; builds aggregate personas; computes Comment Vitality Score per channel; extracts vocabulary and generates moral reframes.
-3. **Output** — A dashboard (and eventually API) that hands a strategist a live map: *what's heating up, who's talking, how to talk back.*
+3. **Advise** — A dashboard (and eventually API) hands a strategist a live map: *what's heating up, who's talking, how to talk back.*
+4. **Create** — Turn the chosen message brief into finished ad creative: HTML5/GSAP display banners, social statics, and video drafts, sized per platform with the required "Paid for by…" disclaimers baked in. **This closes the loop** — listen all the way to a ready-to-ship ad, not a dashboard the client then hands to a separate creative shop.
 
 The whole stack runs in Docker — Postgres (with pgvector), Redis, the API, the workers, and n8n. Self-contained, runnable on one box.
 
@@ -83,12 +85,13 @@ Secondary gaps we sit in:
 | **Real-time conversation** | ✅ Yes | ❌ Survey/panel-lagged | ✅ Yes | ❌ Voter-file | ❌ Project-based |
 | **Politics-native framing** | ✅ Core (MFT) | ⚠️ Partial | ❌ Brand-tuned | ⚠️ | ✅ |
 | **Listen → activate loop** | ✅ The wedge | ⚠️ Has activation | ❌ Dead-ends at dashboard | ✅ Activation only | ❌ |
+| **Ships ready-to-run creative** | ✅ Only one | ❌ | ❌ | ❌ | ❌ |
 | **Serves down-ballot SMB** | ✅ Beachhead | ❌ Enterprise | ❌ Enterprise | ❌ Statewide+ | ❌ Enterprise |
 | **Published price** | Will publish | ❌ Enterprise opaque | ❌ $20K–100K/yr | ❌ Enterprise | ❌ Consulting |
 | **X/Twitter coverage** | ❌ Priced out | ✅ | ✅ | n/a | ✅ |
 | **Data depth / track record** | ❌ Unproven, thin | ✅ 15K+ attributes | ✅ Trillions of docs | ✅ ~90% match | ✅ Credible |
 
-**Honest read:** We win on speed, price, political-framing, and SMB focus. We lose on data depth, track record, X coverage, and trust. The incumbents have years of data and credibility we don't. **Our advantages are go-to-market advantages (niche, price, speed), not deep technical moats.** Resonate could build the listen→activate bridge if they decided the SMB segment was worth it. Our bet is that they won't bother — and that's a real bet, not a certainty.
+**Honest read:** We win on speed, price, political-framing, SMB focus, and — uniquely — **shipping the finished ad.** We lose on data depth, track record, X coverage, and trust. The incumbents have years of data and credibility we don't. **Most of our advantages are go-to-market advantages (niche, price, speed); the creative engine is the one that's closest to a real product moat,** because it's not just a feature decision — it's grounded in a production capability (HTML5/GSAP/video + AdForge tooling) the data-and-insight incumbents don't have and wouldn't build. Resonate could copy the listen→activate bridge if they wanted the SMB segment. They are far less likely to become an ad-production shop. That asymmetry is the most defensible thing we've got.
 
 ---
 
@@ -104,7 +107,9 @@ Three models, in the order I'd actually roll them out:
 
 3. **Self-serve SaaS (the goal, not the start).** $199–499/mo entry tier once the engine is trustworthy enough to stand alone and the dashboard is polished. This is the venture-scalable version — but we get there by earning it, not by launching it.
 
-**Recommendation:** Launch as a managed service. Resist the urge to call it SaaS on day one. The margins are lower and it doesn't scale like software, but it's honest about what the product actually is at MVP, and it generates revenue and validation immediately. Build toward self-serve as the engine proves itself.
+**Creative as the ACV lever.** Across all three models, the creative engine is the upsell that moves the price. Insight alone is a commodity a client could get (worse) from a listening tool; insight *plus the finished ad sized for every platform* is a complete deliverable they'd otherwise pay a separate creative shop for. Price it as either a premium tier or per-creative-set on top of the base subscription/retainer. Realistically this is what takes a $2.5K/mo retainer to $5–8K, and it's the single biggest reason a client picks us over a cheaper dashboard.
+
+**Recommendation:** Launch as a managed service. Resist the urge to call it SaaS on day one. The margins are lower and it doesn't scale like software, but it's honest about what the product actually is at MVP, and it generates revenue and validation immediately. **Lead the sales pitch with the creative — "we don't just tell you what to say, we hand you the ad" — because that's the line no competitor can match.** Build toward self-serve as the engine proves itself.
 
 ---
 
@@ -129,6 +134,8 @@ Scales sub-linearly with volume. This part is genuinely cheap — and **Decodo p
 **US Census API — the credibility multiplier, and it's free.** Not a raw-data source — a *validation layer*. Every aggregate persona we infer (geo, age, income-proxy skew) gets checked against actual Census/ACS figures for that geography. This is the single cheapest thing we can do to attack our biggest risk (untrustworthy inference, Section 8 risk #1). It costs nothing and it directly underwrites the confidence claims the whole product rests on.
 
 **The cost the data table hides: LLM inference.** The narrative, persona, and language engines all call Claude. Running 100K comments/mo through clustering, persona generation, and reframing is real money — realistically **$200–1,000+/mo** depending on how much we route through the LLM vs. cheap embeddings. This is the single most uncertain cost line and it can dwarf the data cost. Flag it, measure it early, optimize aggressively (embeddings for the cheap work, LLM only where it earns its keep).
+
+**Creative generation — a new cost line, but a usage-based one.** The creative engine adds generation cost: image generation (e.g. Nano Banana / equivalent) and video generation (VEO / Kling) are the expensive parts; HTML5/GSAP banners are template-driven and nearly free to produce. This is **per-deliverable, not always-on** — it only fires when a client requests creative, so it scales with the revenue it generates rather than as fixed overhead. Ballpark **$0.50–5 per creative set** depending on video vs. static, easily passed through in the creative upsell pricing. The real cost here is the same as everywhere in this product: **human time to QA the output before it goes to a client** — a politically off-key or compliance-broken ad is worse than no ad.
 
 ### Hosting
 - **MVP:** One decent VPS (Hetzner/DigitalOcean), all services in Docker — **~$40–100/mo.** pgvector is RAM-hungry; size for it.
@@ -179,6 +186,8 @@ Built on the Section 5 pricing roadmap. **The defining feature of this projectio
 
 **Read the shape, not just the numbers.** Year 2 is nearly flat — that's not pessimism, it's the structural reality of an odd-year political market. The business survives 2027 on **advocacy and corporate public-affairs retainers**, which are year-round and cycle-independent. If we can't win that non-campaign revenue, Year 2 is a cash crisis, not a plateau. **Winning advocacy/corporate accounts isn't upside — it's the thing that keeps the lights on between elections.**
 
+**The creative engine is baked into these ACVs — it's the difference between the conservative and base/optimistic columns.** The blended ~$25–35K/account assumes a meaningful share of clients take the creative upsell. Insight-only accounts land at the low end (~$15–20K); accounts that buy insight + ongoing creative production land well above it. The creative attach rate is therefore one of the two biggest levers on revenue (the other being odd-year non-campaign accounts). It also helps the Year 2 trough specifically: advocacy orgs run year-round campaigns and need a steady stream of creative, so the creative engine is a recurring-revenue hook, not just an election-season spike.
+
 ### Margins
 
 - **Managed service:** ~40–60% gross margin. Labor-heavy (the QA and scraper-maintenance reality from Section 6).
@@ -206,21 +215,23 @@ You asked me not to hold back. Here it is.
 
 4. **We're missing X, where political discourse actually lives.** The API is ~$42K/mo for the firehose — unviable. Scraping X violates their ToS (legal grey zone + ban risk). Bluesky/Reddit/YouTube are real signal, but pretending they fully substitute for X would be dishonest.
 
-5. **The moat is go-to-market, not technology.** Niche focus + price + your creative-production edge. A well-resourced incumbent *could* copy the loop. Our bet is that they won't aim at the SMB segment.
+5. **The intelligence moat is go-to-market, not technology.** Niche focus + price + speed. A well-resourced incumbent *could* copy the listen→activate loop. The creative engine is the exception — it's the closest thing to a real product moat (see "what's genuinely strong"), but the *insight* half of the product is replicable. Our bet is the incumbents won't aim at the SMB segment.
 
 6. **The activation side is still hand-wavy.** Microtargeting bans (Meta/Google) mean we're limited to contextual targeting, which is less precise. And the actual integration to push audiences to ad platforms isn't built yet — it's roadmap, not product.
 
-7. **TAM is "good business," not "unicorn."** 2026 political ad spend is ~$10.8B, but the slice that's down-ballot/advocacy *and* buys tools like this is realistically tens of millions, not billions.
+7. **Creative is a second hard product, not a free feature.** Putting creative back in scope is the right strategic call, but be honest about the cost: it's effectively building two products (intelligence + creative generation). It extends the timeline, adds generation cost and QA load, and carries its own compliance burden — political ads need correct "Paid for by…" disclaimers, platform authorization (Meta/Google political-advertiser verification), and creative that doesn't misfire on a sensitive issue. A bad generated political ad is a reputational event, not just a refund. Sequence it *after* the intelligence engine is trustworthy; don't try to ship both perfectly at once.
+
+8. **TAM is "good business," not "unicorn."** 2026 political ad spend is ~$10.8B, but the slice that's down-ballot/advocacy *and* buys tools like this is realistically tens of millions, not billions. (The creative engine *raises* per-account revenue and helps the SOM, but doesn't change the order of magnitude of the market.)
 
 **What's genuinely strong:**
 
 - The gap is real and well-identified. The manual listen→activate handoff is a true unserved need.
 - The compliance architecture (aggregate-up, 24h TTL, US-scoped) is a real, defensible differentiator in a space full of legal landmines.
 - The Moral Foundations framing engine is differentiated and intellectually honest — it's the most novel piece.
-- **Your creative-production background (HTML5/GSAP/video) is the most defensible edge.** Competitors stop at the audience; you can ship the ad. Lean into this hard — it's the thing nobody else in this stack can easily replicate.
+- **The creative engine is the most defensible edge, and it's now in the product.** Competitors stop at the audience; we ship the finished ad. This is grounded in the founder's actual production background (HTML5/GSAP/video) and existing AdForge tooling — a capability the data-and-insight incumbents don't have and are unlikely to build. It's both the strongest moat and the biggest ACV lever. Lean into it hard; it's the line no competitor can match. (Just respect risk #7 — it's also real work.)
 
-**Verdict:** This is a **real product solving a real, validated gap in a defensible niche** — but it is a **high-touch services business with a software moat still under construction**, in a **cyclical market**, with a **maintenance-heavy data layer** and a **trustworthiness promise that's hard to keep at scale.**
+**Verdict:** This is a **real product solving a real, validated gap in a defensible niche, now closing the full loop from listening to finished creative** — but it is a **high-touch services business with a software moat still under construction**, in a **cyclical market**, with a **maintenance-heavy data layer** and a **trustworthiness promise that's hard to keep at scale.** Adding creative strengthens the moat and the pricing power; it also adds scope, so it must be sequenced, not rushed.
 
-It is a good bootstrapped, profitable agency-plus-software business. It is a *harder* venture story. If we go in calling it what it is — a managed intelligence service that's productizing toward SaaS — and lean on the creative-production edge as the wedge, I think it works. If we go in pitching it as a self-serve SaaS rocket, we'll over-promise on margins and scale and get burned on the maintenance and QA reality.
+It is a good bootstrapped, profitable agency-plus-software business. It is a *harder* venture story. If we go in calling it what it is — a managed intelligence service that ships the creative and is productizing toward SaaS — and lead with the creative wedge, I think it works. If we go in pitching it as a self-serve SaaS rocket, we'll over-promise on margins and scale and get burned on the maintenance and QA reality.
 
 **My recommendation: build it, launch it as a managed service, price it like one, and let the software earn its way to self-serve.**
