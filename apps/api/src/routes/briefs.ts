@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { supabase } from '../lib/supabase.js'
+import { db } from '../lib/db.js'
 import { queues } from '../lib/queues.js'
 import { requireAuth } from '../lib/auth.js'
 
@@ -14,16 +14,14 @@ const GenerateBriefSchema = z.object({
 })
 
 briefsRouter.get('/issue/:issueId', requireAuth, async (c) => {
-  const { data, error } = await supabase
-    .from('briefs')
-    .select('*')
-    .eq('issue_id', c.req.param('issueId'))
-    .order('created_at', { ascending: false })
-  if (error) return c.json({ error: error.message }, 500)
-  return c.json(data)
+  const rows = await db`
+    SELECT * FROM briefs
+    WHERE issue_id = ${c.req.param('issueId')}
+    ORDER BY created_at DESC
+  `
+  return c.json(rows)
 })
 
-// Authenticated: dashboard users trigger brief generation.
 briefsRouter.post('/generate', requireAuth, async (c) => {
   const body = await c.req.json()
   const parsed = GenerateBriefSchema.safeParse(body)

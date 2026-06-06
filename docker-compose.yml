@@ -1,55 +1,39 @@
 services:
-  # ─── API (Hono/Node.js) ───────────────────────────────────────────────
-  api:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    container_name: polireports-api
+  # ─── PostgreSQL + pgvector ────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: polireports-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polireports}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-polireports}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-polireports}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - polireports
+
+  # ─── pgAdmin (DB management UI) ──────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: polireports-pgadmin
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
-    env_file: .env
+      - "127.0.0.1:5050:80"
     environment:
-      - NODE_ENV=development
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:?PGADMIN_EMAIL must be set}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set}
     depends_on:
-      redis:
+      postgres:
         condition: service_healthy
     volumes:
-      - ./apps/api/src:/app/src  # hot reload in dev
-    networks:
-      - polireports
-
-  # ─── Worker (same codebase, different entrypoint) ─────────────────────
-  worker:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    container_name: polireports-worker
-    restart: unless-stopped
-    command: node dist/worker.js
-    env_file: .env
-    environment:
-      - NODE_ENV=development
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - polireports
-
-  # ─── Dashboard (React/Vite) ───────────────────────────────────────────
-  dashboard:
-    build:
-      context: ./apps/dashboard
-      dockerfile: Dockerfile
-    container_name: polireports-dashboard
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5173:5173"
-    env_file: .env
-    environment:
-      - VITE_API_URL=http://localhost:3000
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - polireports
 
@@ -58,8 +42,6 @@ services:
     image: redis:7-alpine
     container_name: polireports-redis
     restart: unless-stopped
-    # No host port mapping — internal docker network only.
-    # Access from host for debugging: docker exec polireports-redis redis-cli -a $REDIS_PASSWORD
     volumes:
       - redis_data:/data
     command: >
@@ -76,13 +58,72 @@ services:
     networks:
       - polireports
 
-  # ─── n8n (orchestration / scheduling) ────────────────────────────────
+  # ─── API (Hono/Node.js) ───────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: polireports-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-polireports}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-polireports}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src
+    networks:
+      - polireports
+
+  # ─── Worker (BullMQ) ─────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: polireports-worker
+    restart: unless-stopped
+    command: node dist/worker.js
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-polireports}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-polireports}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - polireports
+
+  # ─── Dashboard (React/Vite) ───────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+    container_name: polireports-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    networks:
+      - polireports
+
+  # ─── n8n (orchestration) ─────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: polireports-n8n
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5678:5678"   # localhost only — not exposed to network
+      - "127.0.0.1:5678:5678"
     env_file: .env
     environment:
       - N8N_HOST=localhost
@@ -102,7 +143,7 @@ services:
     networks:
       - polireports
 
-  # ─── Redis UI (dev only) ──────────────────────────────────────────────
+  # ─── Redis UI (dev profile only) ─────────────────────────────────────
   redis-ui:
     image: redis/redisinsight:latest
     container_name: polireports-redis-ui
@@ -115,6 +156,8 @@ services:
       - polireports
 
 volumes:
+  postgres_data:
+  pgadmin_data:
   redis_data:
   n8n_data:
 
