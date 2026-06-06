@@ -289,10 +289,14 @@ CREATE TABLE briefs (
   generated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   valid_until           TIMESTAMPTZ,
   superseded_by         UUID REFERENCES briefs(id),
+  -- Owner of this brief. Briefs encode client-specific strategy
+  -- (position/principle/segment) and must never leak across clients.
+  created_by            UUID REFERENCES users(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX ON briefs (issue_id, brief_type);
+CREATE INDEX ON briefs (created_by, created_at DESC);
 CREATE INDEX ON briefs (overall_confidence);
 CREATE INDEX ON briefs (generated_at DESC);
 

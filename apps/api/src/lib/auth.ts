@@ -16,7 +16,7 @@ export async function signToken(payload: { sub: string; role: string }) {
 }
 
 export async function verifyToken(token: string) {
-  const { payload } = await jwtVerify(token, getJwtSecret())
+  const { payload } = await jwtVerify(token, getJwtSecret(), { algorithms: ['HS256'] })
   return payload as { sub: string; role: string }
 }
 

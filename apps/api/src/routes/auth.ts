@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { hash, compare } from 'bcryptjs'
 import { db } from '../lib/db.js'
-import { signToken } from '../lib/auth.js'
+import { signToken, requireInternalToken } from '../lib/auth.js'
 
 export const authRouter = new Hono()
 
@@ -11,7 +11,15 @@ const CredSchema = z.object({
   password: z.string().min(12),
 })
 
-authRouter.post('/register', async (c) => {
+// Pre-computed bcrypt hash of a random string. Compared against on
+// login when no user is found, so response time is constant regardless
+// of whether the email exists (defeats user-enumeration timing oracle).
+const DUMMY_HASH = '$2a$12$C6UzMDM.H6dfI/f/IKcEeO3oUaXq6h5Y3PqHq9Xq8Xq8Xq8Xq8Xq.'
+
+// Registration is admin-provisioning only — gated behind the internal
+// token, not public. Prevents anyone from self-registering into the
+// tenant and reading shared issue/persona data.
+authRouter.post('/register', requireInternalToken, async (c) => {
   const body = await c.req.json()
   const parsed = CredSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
@@ -35,10 +43,11 @@ authRouter.post('/login', async (c) => {
   const [user] = await db`
     SELECT id, email, role, password_hash FROM users WHERE email = ${parsed.data.email}
   `
-  if (!user) return c.json({ error: 'invalid credentials' }, 401)
-
-  const ok = await compare(parsed.data.password, user.passwordHash)
-  if (!ok) return c.json({ error: 'invalid credentials' }, 401)
+  // Always run a compare — constant time whether or not the email exists.
+  const ok = user
+    ? await compare(parsed.data.password, user.passwordHash)
+    : await compare(parsed.data.password, DUMMY_HASH)
+  if (!user || !ok) return c.json({ error: 'invalid credentials' }, 401)
 
   await db`UPDATE users SET last_login_at = NOW() WHERE id = ${user.id}`
   const token = await signToken({ sub: user.id, role: user.role })

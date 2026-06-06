@@ -14,9 +14,11 @@ const GenerateBriefSchema = z.object({
 })
 
 briefsRouter.get('/issue/:issueId', requireAuth, async (c) => {
+  // Briefs are owner-scoped — only return the caller's own briefs.
   const rows = await db`
     SELECT * FROM briefs
     WHERE issue_id = ${c.req.param('issueId')}
+      AND created_by = ${c.get('userId')}
     ORDER BY created_at DESC
   `
   return c.json(rows)
@@ -26,6 +28,10 @@ briefsRouter.post('/generate', requireAuth, async (c) => {
   const body = await c.req.json()
   const parsed = GenerateBriefSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
-  const job = await queues.language.add('generate-brief', parsed.data)
+  // Stamp the owner so the worker can persist created_by.
+  const job = await queues.language.add('generate-brief', {
+    ...parsed.data,
+    createdBy: c.get('userId'),
+  })
   return c.json({ jobId: job.id }, 202)
 })
