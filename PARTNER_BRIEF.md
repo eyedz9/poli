@@ -45,13 +45,14 @@ Bluesky firehose   ┘      Language engine      ┘     Confidence on everythin
 
 The whole stack runs in Docker — Postgres (with pgvector), Redis, the API, the workers, and n8n. Self-contained, runnable on one box.
 
-**Three design commitments that matter:**
+**Four design commitments that matter:**
 
 - **Aggregate-up, never individual-down.** We profile cohorts, not people. This is the opposite of the Cambridge Analytica approach and it's what keeps us on the right side of CCPA/GDPR.
 - **Raw data has a 24-hour TTL.** Author-associated comment data is deleted within a day. This is architectural, not a setting.
 - **Confidence on every output.** Every inference carries a confidence score. Thin data (under ~50 comments on an issue) is flagged "do not activate" rather than dressed up as insight.
+- **Calibrated against ground truth (US Census API).** Our aggregate persona inferences (geographic, age, income-proxy skews) are validated against actual Census/ACS data for the same geography. When the model says "this cohort skews younger and urban," we can check that against the real population of that area. This turns a probabilistic guess into a guess *with a reality check* — and it's free.
 
-That last point is the entire product philosophy: **a wrong confident answer destroys credibility faster than an honest "we're 70% sure."**
+That third point is the entire product philosophy: **a wrong confident answer destroys credibility faster than an honest "we're 70% sure."** The Census calibration (fourth point) is how we earn the right to make confident claims at all.
 
 ---
 
@@ -112,14 +113,20 @@ Three models, in the order I'd actually roll them out:
 ### Data
 At MVP scale (~100K comments/mo, ~10K trend queries):
 
-| Source | Cost |
-|---|---|
-| Bright Data (scraping infra) | ~$75–150/mo |
-| Apify (Reddit) | ~$30–50/mo |
-| Google Trends, GDELT, Bluesky, YouTube | $0 |
-| **Subtotal (raw data)** | **~$100–200/mo** |
+| Source | Cost | Note |
+|---|---|---|
+| Decodo scraping API (ex-Smartproxy) | ~$30–80/mo | Web Scraping API from **$0.09/1K req**, residential from $2/GB. Cheapest credible option. |
+| Bright Data (scraping infra) | ~$75–150/mo | $0.75/1K. Pricier, but **best legal standing** (won Meta/X v. Bright Data) + 98.44% benchmarked success. |
+| Apify (Reddit) | ~$30–50/mo | $3/1K. Best for Reddit-specific actors. |
+| Google Trends, GDELT, Bluesky, YouTube | $0 | Free public/official sources. |
+| **US Census API** | **$0** | Free. Calibration ground-truth, not a raw-data source — see below. |
+| **Subtotal (raw data)** | **~$60–200/mo** | Lower end now achievable by routing volume through Decodo. |
 
-Scales sub-linearly with volume. This part is genuinely cheap.
+Scales sub-linearly with volume. This part is genuinely cheap — and **Decodo pushes the floor lower.**
+
+**On scraping vendors — honest tradeoff, not "cheapest wins."** Decodo's $0.09/1K headline is a real cost lever and we should route bulk, low-sensitivity scraping through it. **But cheaper isn't strictly better in political scraping**, where legal posture matters: Bright Data's value was never the price, it was the courtroom win and the legal cover that comes with it. The right play is **Decodo as primary for cost, Bright Data kept available for legally-sensitive or hard-to-reach targets** — and never single-vendor (a ban event on one provider shouldn't take the product down). Also note Decodo's "from $0.09/1K" is a floor; real cost rises with success rate and harder targets.
+
+**US Census API — the credibility multiplier, and it's free.** Not a raw-data source — a *validation layer*. Every aggregate persona we infer (geo, age, income-proxy skew) gets checked against actual Census/ACS figures for that geography. This is the single cheapest thing we can do to attack our biggest risk (untrustworthy inference, Section 8 risk #1). It costs nothing and it directly underwrites the confidence claims the whole product rests on.
 
 **The cost the data table hides: LLM inference.** The narrative, persona, and language engines all call Claude. Running 100K comments/mo through clustering, persona generation, and reframing is real money — realistically **$200–1,000+/mo** depending on how much we route through the LLM vs. cheap embeddings. This is the single most uncertain cost line and it can dwarf the data cost. Flag it, measure it early, optimize aggressively (embeddings for the cheap work, LLM only where it earns its keep).
 
@@ -136,7 +143,7 @@ This is where the honest assessment matters most. **The ongoing cost is not infr
 
 Realistically, at MVP this is **most of one person's time** (the maintenance + QA), plus development. Infrastructure is rounding error next to that.
 
-**Summary cost picture at MVP:** ~$150–350/mo data, ~$200–1,000/mo LLM, ~$40–100/mo hosting → call it **$400–1,500/mo in hard costs**, dominated by LLM inference. The dominant *real* cost is human time, not the bill.
+**Summary cost picture at MVP:** ~$60–200/mo data (Decodo lowers this), ~$200–1,000/mo LLM, ~$40–100/mo hosting, Census $0 → call it **$300–1,300/mo in hard costs**, dominated by LLM inference. The dominant *real* cost is human time, not the bill.
 
 ---
 
@@ -191,7 +198,7 @@ You asked me not to hold back. Here it is.
 
 **The real risks, no sugarcoating:**
 
-1. **The trustworthiness promise is both the product and the hardest thing to deliver.** Inferring demographics and psychographics from public comments is genuinely probabilistic and often shaky. If we confidently get it wrong in front of a client, the credibility — which is the whole product — is gone. The confidence-scoring discipline is good, but it's a constant fight against the temptation to manufacture precision.
+1. **The trustworthiness promise is both the product and the hardest thing to deliver.** Inferring demographics and psychographics from public comments is genuinely probabilistic and often shaky. If we confidently get it wrong in front of a client, the credibility — which is the whole product — is gone. The confidence-scoring discipline is good, but it's a constant fight against the temptation to manufacture precision. **Partially mitigated now** by Census/ACS calibration (Section 2 + 6): we can validate geographic/demographic skews against real population data, which catches the worst confident-but-wrong errors. It does *not* fully solve psychographic inference (values, persuadability) — Census has no data on those — so the risk is reduced, not eliminated.
 
 2. **It's not really SaaS at MVP — it's a service with software.** Lower margins, doesn't scale like software, harder VC story. That's fine for a profitable bootstrapped business; it's a weaker pitch if the plan is to raise and rocket.
 
