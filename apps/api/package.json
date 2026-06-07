@@ -10,6 +10,7 @@
     "worker": "tsx src/worker.ts",
     "worker:dev": "tsx watch src/worker.ts",
     "seed": "tsx src/scripts/seed.ts",
+    "eval": "tsx src/eval/run.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

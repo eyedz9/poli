@@ -81,6 +81,9 @@ CREATE TABLE corpus_signals (
 CREATE INDEX ON corpus_signals (issue_id, collected_at DESC);
 CREATE INDEX ON corpus_signals (platform, collected_at DESC);
 CREATE INDEX ON corpus_signals USING GIN (framing_tags);
+-- Vector similarity index for embed->cluster->label (HNSW, cosine).
+-- Without this, clustering/similarity queries seq-scan every signal.
+CREATE INDEX ON corpus_signals USING hnsw (embedding vector_cosine_ops);
 
 -- ─── issues ───────────────────────────────────────────────────────────────────
 
@@ -134,6 +137,8 @@ CREATE INDEX ON issues (primary_state);
 CREATE INDEX ON issues (last_signal_at DESC);
 CREATE INDEX ON issues USING GIN (geo_codes);
 CREATE INDEX ON issues USING GIN (themes);
+-- Cluster centroid similarity — assign a new signal to its nearest issue.
+CREATE INDEX ON issues USING hnsw (cluster_centroid vector_cosine_ops);
 
 -- ─── issue_snapshots (momentum history) ──────────────────────────────────────
 
